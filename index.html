@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Simulatore Indovinello – Scacchiera 4x4</title>
+  <style>
+    :root {
+      --bg: #0f172a;        /* slate-900 */
+      --panel: #111827;     /* gray-900 */
+      --muted: #94a3b8;     /* slate-400 */
+      --text: #e5e7eb;      /* gray-200 */
+      --accent: #22d3ee;    /* cyan-400 */
+      --accent-2: #34d399;  /* emerald-400 */
+      --danger: #f87171;    /* red-400 */
+      --warn: #fbbf24;      /* amber-400 */
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: radial-gradient(1200px 600px at 20% 0%, #111827, #0b1024), var(--bg);
+      color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    }
+    .app {
+      width: min(920px, 98vw); display: grid; gap: 16px;
+    }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    header h1 { font-size: clamp(18px, 3vw, 24px); margin: 0; letter-spacing: 0.3px; }
+    header .badge { font-size: 12px; color: #0b1220; background: linear-gradient(90deg, var(--accent), var(--accent-2)); padding: 4px 8px; border-radius: 999px; font-weight: 700; }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid rgba(148,163,184,0.15);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+      padding: 14px; border-radius: 16px;
+    }
+
+    .controls { display: grid; gap: 10px; grid-template-columns: repeat(12, 1fr); align-items: center; }
+    .controls .row { display: contents; }
+
+    .btn {
+      appearance: none; border: 1px solid rgba(148,163,184,0.25);
+      background: rgba(255,255,255,0.02); color: var(--text);
+      padding: 10px 12px; border-radius: 12px; cursor: pointer; font-weight: 600;
+      transition: transform .08s ease, border-color .12s ease, background .12s ease, opacity .2s ease;
+      user-select: none;
+    }
+    .btn:hover { border-color: rgba(148,163,184,0.5); }
+    .btn:active { transform: translateY(1px); }
+    .btn[disabled] { opacity: .5; cursor: not-allowed; }
+    .btn.primary { border-color: transparent; background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: #051018; }
+    .btn.danger { border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.12); }
+    .btn.warn { border-color: rgba(251,191,36,0.4); background: rgba(251,191,36,0.12); }
+
+    .status {
+      display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted);
+    }
+
+    .board-wrap { display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+    @media (max-width: 860px) { .board-wrap { grid-template-columns: 1fr; } }
+
+    .board.panel { padding: 18px; }
+    .grid {
+      --size: 4; display: grid; grid-template-columns: repeat(var(--size), 1fr); gap: 10px;
+    }
+
+    .cell {
+      position: relative; aspect-ratio: 1 / 1; border-radius: 16px; overflow: hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid rgba(148,163,184,0.15);
+    }
+
+    .coin {
+      width: 100%; height: 100%;
+      display: grid; place-items: center; font-weight: 800; font-size: clamp(18px, 5vw, 28px);
+      letter-spacing: 1px; cursor: pointer; user-select: none; text-transform: uppercase;
+      transition: transform .1s ease, background .2s ease, opacity .2s ease;
+    }
+    .coin.disabled { cursor: not-allowed; opacity: .6; }
+    .coin.head { background: radial-gradient(200px 140px at 30% 20%, rgba(34,211,238,0.25), rgba(255,255,255,0.02)); }
+    .coin.tail { background: radial-gradient(200px 140px at 70% 80%, rgba(52,211,153,0.25), rgba(255,255,255,0.02)); }
+
+    .key {
+      position: absolute; right: 8px; top: 6px; font-size: clamp(14px, 3.4vw, 20px);
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
+      opacity: .95; pointer-events: none;
+    }
+    .key.hidden { display: none; }
+
+    .sidebar.panel { display: grid; gap: 12px; align-content: start; }
+    .legend { font-size: 13px; color: var(--muted); display: grid; gap: 6px; }
+    .legend b { color: var(--text); }
+    .hint { font-size: 12px; color: var(--muted); }
+    .sep { height: 1px; background: rgba(148,163,184,0.2); margin: 4px 0; }
+
+    .phase-tag { font-weight: 800; font-size: 12px; padding: 4px 8px; border-radius: 999px; width: max-content; }
+    .phase-setup { background: rgba(34,211,238,0.12); border: 1px solid rgba(34,211,238,0.45); color: #a5f3fc; }
+    .phase-p1 { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.45); color: #fde68a; }
+    .phase-p2 { background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.45); color: #bbf7d0; }
+    .phase-result { background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.45); color: #fecaca; }
+
+    .toast { font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Simulatore – Monete & Chiave (4×4)</h1>
+      <span class="badge">no spoiler della strategia 😉</span>
+    </header>
+
+    <div class="panel controls">
+      <div class="row">
+        <button id="newGame" class="btn">🔁 Nuovo gioco</button>
+        <button id="randomize" class="btn">🎲 Randomizza monete</button>
+        <button id="toggleSetKey" class="btn">🔑 Imposta chiave</button>
+        <button id="showHideKey" class="btn warn">👁️ Mostra/Nascondi chiave</button>
+        <button id="startP1" class="btn primary">▶️ Inizia Fase Prigioniero 1</button>
+        <button id="passToP2" class="btn" disabled>➡️ Passa al Prigioniero 2</button>
+        <button id="reveal" class="btn danger" disabled>📣 Rivela esito</button>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <div class="board panel">
+        <div class="status">
+          <div id="phaseTag" class="phase-tag phase-setup">FASE: Setup</div>
+          <div id="statusText">Imposta la chiave (clic su una casella) e/o randomizza le monete. Puoi anche flipparle a piacere.</div>
+        </div>
+        <div class="sep"></div>
+        <div id="grid" class="grid" aria-label="Scacchiera 4x4"></div>
+      </div>
+
+      <aside class="sidebar panel">
+        <div class="legend">
+          <div><b>Obiettivo:</b> prova la dinamica del gioco su una griglia 4×4. In Fase P1 puoi capovolgere <b>una sola</b> moneta. In Fase P2 devi indicare la casella con la chiave.</div>
+          <div class="sep"></div>
+          <div>Legenda monete: <b>T</b> = Testa, <b>C</b> = Croce.</div>
+          <div>Posizionamento chiave: usa “Imposta chiave”, poi clicca una casella.</div>
+          <div>Visibilità chiave: il direttore la mostra a P1 e la nasconde per P2.</div>
+          <div class="hint">Questo è solo un simulatore manuale per fare esperimenti. Nessuna soluzione o suggerimento viene mostrato.</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    // === Stato del gioco ===
+    const SIZE = 4;           // 4x4 come richiesto
+    const N = SIZE * SIZE;
+    let board = new Array(N).fill(false); // false=Croce, true=Testa
+    let keyIndex = 0;         // indice [0..15]
+    let showKey = true;       // visibilità icona chiave
+    let setKeyMode = false;   // se true, clic su cella imposta la chiave
+    let phase = 'setup';      // 'setup' | 'p1' | 'p2' | 'result'
+    let flipsThisP1 = 0;      // capovolgimenti effettuati da P1 (max 1)
+    let p2Guess = null;       // scelta di P2
+
+    // === Riferimenti DOM ===
+    const elGrid = document.getElementById('grid');
+    const elPhaseTag = document.getElementById('phaseTag');
+    const elStatus = document.getElementById('statusText');
+    const btnNew = document.getElementById('newGame');
+    const btnRand = document.getElementById('randomize');
+    const btnSetKey = document.getElementById('toggleSetKey');
+    const btnShowKey = document.getElementById('showHideKey');
+    const btnStartP1 = document.getElementById('startP1');
+    const btnPassP2 = document.getElementById('passToP2');
+    const btnReveal = document.getElementById('reveal');
+
+    // === Utility ===
+    const idxToRC = (i) => ({ r: Math.floor(i / SIZE), c: i % SIZE });
+    const rcToIdx = (r, c) => r * SIZE + c;
+
+    function toast(msg) {
+      elStatus.innerHTML = `<span class="toast">${msg}</span>`;
+    }
+
+    function setPhase(newPhase) {
+      phase = newPhase;
+      elPhaseTag.className = 'phase-tag ' + (
+        phase === 'setup' ? 'phase-setup'
+        : phase === 'p1' ? 'phase-p1'
+        : phase === 'p2' ? 'phase-p2'
+        : 'phase-result'
+      );
+      elPhaseTag.textContent = 'FASE: ' + (phase === 'setup' ? 'Setup' : phase === 'p1' ? 'Prigioniero 1' : phase === 'p2' ? 'Prigioniero 2' : 'Risultato');
+
+      // Controlli abilitati/disabilitati per fase
+      if (phase === 'setup') {
+        btnStartP1.disabled = false;
+        btnPassP2.disabled = true;
+        btnReveal.disabled = true;
+        btnRand.disabled = false;
+        btnSetKey.disabled = false;
+        btnShowKey.disabled = false;
+      } else if (phase === 'p1') {
+        btnStartP1.disabled = true;
+        btnPassP2.disabled = flipsThisP1 !== 1; // abilita dopo 1 flip
+        btnReveal.disabled = true;
+        btnRand.disabled = true;
+        btnSetKey.disabled = true;
+        btnShowKey.disabled = false; // il direttore può mostrare/nascondere durante P1
+      } else if (phase === 'p2') {
+        btnStartP1.disabled = true;
+        btnPassP2.disabled = true;
+        btnReveal.disabled = (p2Guess === null);
+        btnRand.disabled = true;
+        btnSetKey.disabled = true;
+        btnShowKey.disabled = true; // chiave nascosta per P2
+      } else {
+        // result
+        btnStartP1.disabled = true;
+        btnPassP2.disabled = true;
+        btnReveal.disabled = true;
+        btnRand.disabled = true;
+        btnSetKey.disabled = true;
+        // dopo il risultato puoi mostrare la chiave
+        btnShowKey.disabled = false;
+      }
+
+      render();
+    }
+
+    function newGame() {
+      board = board.map(() => Math.random() < 0.5); // random T/C
+      keyIndex = Math.floor(Math.random() * N);
+      showKey = true;
+      setKeyMode = false;
+      flipsThisP1 = 0;
+      p2Guess = null;
+      setPhase('setup');
+      elStatus.textContent = 'Imposta (o lascia casuale) chiave e monete, poi avvia la Fase Prigioniero 1.';
+      btnSetKey.textContent = '🔑 Imposta chiave';
+    }
+
+    function randomizeCoins() {
+      board = board.map(() => Math.random() < 0.5);
+      render();
+    }
+
+    function toggleSetKeyMode() {
+      setKeyMode = !setKeyMode;
+      btnSetKey.textContent = setKeyMode ? '✅ Clicca una casella…' : '🔑 Imposta chiave';
+      toast(setKeyMode ? 'Modalità impostazione chiave attiva: clicca una casella.' : 'Modalità impostazione chiave disattivata.');
+    }
+
+    function toggleShowKey() {
+      showKey = !showKey;
+      render();
+    }
+
+    function startP1() {
+      flipsThisP1 = 0;
+      showKey = true; // il direttore la mostra a P1
+      setPhase('p1');
+      elStatus.textContent = 'P1: puoi capovolgere UNA sola moneta. Poi passa al P2.';
+    }
+
+    function passToP2() {
+      if (flipsThisP1 !== 1) {
+        toast('Devi capovolgere esattamente UNA moneta prima di passare.');
+        return;
+      }
+      showKey = false; // il direttore la nasconde a P2
+      setPhase('p2');
+      elStatus.textContent = 'P2: clicca la casella in cui pensi sia la chiave.';
+    }
+
+    function reveal() {
+      setPhase('result');
+      showKey = true; // ora si può vedere dov’era la chiave
+      const ok = p2Guess === keyIndex;
+      elStatus.innerHTML = ok
+        ? '✔️ Esatto! La chiave era proprio lì. Premi “Nuovo gioco” per ripartire.'
+        : '❌ Sbagliato. Premi “Nuovo gioco” per riprovare.';
+      render();
+    }
+
+    // === Rendering ===
+    function render() {
+      elGrid.style.setProperty('--size', SIZE);
+      elGrid.innerHTML = '';
+      for (let i = 0; i < N; i++) {
+        const { r, c } = idxToRC(i);
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+
+        const coin = document.createElement('button');
+        coin.className = 'coin ' + (board[i] ? 'head' : 'tail');
+        coin.textContent = board[i] ? 'T' : 'C';
+        coin.setAttribute('aria-label', `R${r+1}C${c+1} ${board[i] ? 'Testa' : 'Croce'}`);
+
+        // Abilitazione/disabilitazione click a seconda della fase
+        let clickable = false;
+        if (phase === 'setup') clickable = true; // libero
+        else if (phase === 'p1') clickable = flipsThisP1 < 1; // una sola volta
+        else clickable = false; // in P2/risultato non si flippa
+
+        if (!clickable) coin.classList.add('disabled');
+
+        coin.addEventListener('click', () => {
+          if (!clickable) return;
+          // se si sta impostando la chiave, il click sulla cella può anche cambiare la chiave
+          if (setKeyMode && phase === 'setup') {
+            keyIndex = i; render(); return;
+          }
+          // flip della moneta
+          board[i] = !board[i];
+          if (phase === 'p1') {
+            flipsThisP1 += 1;
+            btnPassP2.disabled = (flipsThisP1 !== 1);
+          }
+          render();
+        });
+
+        const keyIcon = document.createElement('div');
+        keyIcon.className = 'key' + (showKey ? '' : ' hidden');
+        keyIcon.textContent = '🔑';
+        if (i !== keyIndex) keyIcon.classList.add('hidden');
+
+        // In fase P2, il click sulla cella serve per scegliere la casella della chiave
+        if (phase === 'p2') {
+          cell.style.cursor = 'pointer';
+          coin.classList.add('disabled');
+          cell.addEventListener('click', () => {
+            p2Guess = i;
+            btnReveal.disabled = false;
+            // evidenzia scelta
+            document.querySelectorAll('.cell').forEach(c => c.style.outline = 'none');
+            cell.style.outline = '3px solid rgba(34,211,238,0.8)';
+            cell.style.outlineOffset = '-3px';
+          });
+        }
+
+        cell.appendChild(coin);
+        cell.appendChild(keyIcon);
+        elGrid.appendChild(cell);
+      }
+    }
+
+    // === Wiring bottoni ===
+    btnNew.addEventListener('click', newGame);
+    btnRand.addEventListener('click', randomizeCoins);
+    btnSetKey.addEventListener('click', toggleSetKeyMode);
+    btnShowKey.addEventListener('click', toggleShowKey);
+    btnStartP1.addEventListener('click', startP1);
+    btnPassP2.addEventListener('click', passToP2);
+    btnReveal.addEventListener('click', reveal);
+
+    // Primo avvio
+    newGame();
+  </script>
+</body>
+</html>
